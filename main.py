@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN, SUPER_ADMIN_IDS
 from database.engine import engine, async_session, Base
 from database.crud import get_user, set_user_role
+from sqlalchemy import text
 from handlers.user import router as user_router
 from handlers.admin import router as admin_router
 from middlewares.auth import AuthMiddleware
@@ -26,6 +27,27 @@ logger = logging.getLogger(__name__)
 
 async def create_tables():
     async with engine.begin() as conn:
+        # Avval users jadvalida tg_id column borligini ta'minlaymiz
+        # (eski DB da jadval boshqa strukturada bo'lishi mumkin)
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                -- tg_id column yo'q bo'lsa qo'shamiz
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'users'
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'users'
+                      AND column_name = 'tg_id'
+                ) THEN
+                    ALTER TABLE users ADD COLUMN tg_id BIGINT;
+                    ALTER TABLE users ADD CONSTRAINT uq_users_tg_id UNIQUE (tg_id);
+                    CREATE INDEX IF NOT EXISTS ix_users_tg_id ON users (tg_id);
+                END IF;
+            END $$;
+        """))
         await conn.run_sync(Base.metadata.create_all)
     logger.info("✅ Jadvallar tekshirildi / yaratildi.")
 
