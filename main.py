@@ -9,7 +9,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN, SUPER_ADMIN_IDS
 from database.engine import engine, async_session, Base
 from database.crud import get_user, set_user_role
-from sqlalchemy import text
 from handlers.user import router as user_router
 from handlers.admin import router as admin_router
 from middlewares.auth import AuthMiddleware
@@ -27,27 +26,6 @@ logger = logging.getLogger(__name__)
 
 async def create_tables():
     async with engine.begin() as conn:
-        # 1. Avval users jadvalida tg_id uchun unique constraint borligini ta'minlaymiz
-        # (eski DB da jadval mavjud bo'lsa, FK ishlashi uchun unique constraint kerak)
-        await conn.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_constraint
-                    WHERE conname = 'uq_users_tg_id' AND conrelid = 'users'::regclass
-                ) THEN
-                    IF EXISTS (
-                        SELECT 1 FROM information_schema.tables
-                        WHERE table_name = 'users'
-                    ) THEN
-                        ALTER TABLE users ADD CONSTRAINT uq_users_tg_id UNIQUE (tg_id);
-                    END IF;
-                END IF;
-            EXCEPTION WHEN others THEN
-                NULL;
-            END $$;
-        """))
-        # 2. Barcha jadvallarni yaratamiz (mavjudlarni o'zgartirmaydi)
         await conn.run_sync(Base.metadata.create_all)
     logger.info("✅ Jadvallar tekshirildi / yaratildi.")
 

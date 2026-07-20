@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
     BigInteger, String, Text, Boolean, Integer,
-    DateTime, ForeignKey, UniqueConstraint
+    DateTime, UniqueConstraint
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from database.engine import Base
 
 
@@ -19,16 +19,11 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     full_name: Mapped[str] = mapped_column(String(256), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="user")
-    referer_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=True, index=True)
+    referer_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     balance: Mapped[int] = mapped_column(Integer, default=0)
     withdrawn: Mapped[int] = mapped_column(Integer, default=0)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     registered_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    purchases: Mapped[list["Purchase"]] = relationship("Purchase", back_populates="user", foreign_keys="Purchase.user_id")
-    withdrawals: Mapped[list["Withdrawal"]] = relationship("Withdrawal", back_populates="user")
-    referrals_given: Mapped[list["Referral"]] = relationship("Referral", back_populates="referrer", foreign_keys="Referral.referrer_id")
-    support_tickets: Mapped[list["SupportTicket"]] = relationship("SupportTicket", back_populates="user")
 
 
 class Course(Base):
@@ -46,14 +41,8 @@ class Course(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
-    purchases: Mapped[list["Purchase"]] = relationship("Purchase", back_populates="course")
-
 
 class CourseBundle(Base):
-    """
-    Chegirma qoidasi: N ta kurs tanlansa — umumiy narx bundle_price bo'ladi.
-    Agar mos bundle topilmasa — kurslar narxi oddiy qo'shiladi.
-    """
     __tablename__ = "course_bundles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -65,13 +54,11 @@ class CourseBundle(Base):
 
 
 class Purchase(Base):
-    """Bitta yoki bir nechta kurs uchun bitta to'lov"""
     __tablename__ = "purchases"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=False, index=True)
-    course_id: Mapped[int] = mapped_column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
-    # group_id: bir xil to'lovga tegishli kurslar bir xil group_id ga ega
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    course_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     group_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     receipt_photo: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -85,21 +72,16 @@ class Purchase(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="purchases", foreign_keys=[user_id])
-    course: Mapped["Course"] = relationship("Course", back_populates="purchases")
-
 
 class Referral(Base):
     __tablename__ = "referrals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    referrer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=False, index=True)
-    referral_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=False, index=True)
+    referrer_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    referral_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     bonus_earned: Mapped[int] = mapped_column(Integer, default=0)
     is_bought: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    referrer: Mapped["User"] = relationship("User", back_populates="referrals_given", foreign_keys=[referrer_id])
 
     __table_args__ = (
         UniqueConstraint("referral_id", name="uq_referral_referral_id"),
@@ -110,7 +92,7 @@ class Withdrawal(Base):
     __tablename__ = "withdrawals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     card_number: Mapped[str] = mapped_column(String(32), nullable=False)
     card_holder: Mapped[str | None] = mapped_column(String(256), nullable=True)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -118,8 +100,6 @@ class Withdrawal(Base):
     admin_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-    user: Mapped["User"] = relationship("User", back_populates="withdrawals")
 
 
 class AdminLog(Base):
@@ -150,14 +130,12 @@ class SupportTicket(Base):
     __tablename__ = "support_tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     message_id: Mapped[int] = mapped_column(Integer, nullable=False)
     admin_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="open")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-
-    user: Mapped["User"] = relationship("User", back_populates="support_tickets")
 
 
 class SponsorChannel(Base):
