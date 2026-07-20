@@ -27,29 +27,21 @@ logger = logging.getLogger(__name__)
 
 async def create_tables():
     async with engine.begin() as conn:
-        # Avval users jadvalida tg_id column borligini ta'minlaymiz
-        # (eski DB da jadval boshqa strukturada bo'lishi mumkin)
-        await conn.execute(text("""
-            DO $$
-            BEGIN
-                -- tg_id column yo'q bo'lsa qo'shamiz
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'users'
-                ) AND NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name = 'users'
-                      AND column_name = 'tg_id'
-                ) THEN
-                    ALTER TABLE users ADD COLUMN tg_id BIGINT;
-                    ALTER TABLE users ADD CONSTRAINT uq_users_tg_id UNIQUE (tg_id);
-                    CREATE INDEX IF NOT EXISTS ix_users_tg_id ON users (tg_id);
-                END IF;
-            END $$;
-        """))
+        # Eski jadvallarni to'liq o'chirib qayta yaratamiz
+        # (strukturasi mos bo'lmagan jadvallar muammo chiqarmasligi uchun)
+        await conn.execute(text("DROP TABLE IF EXISTS referrals CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS support_tickets CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS withdrawals CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS purchases CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS courses CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS course_bundles CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS payment_cards CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS sponsor_channels CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS bot_settings CASCADE"))
+        await conn.execute(text("DROP TABLE IF EXISTS admin_logs CASCADE"))
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("✅ Jadvallar tekshirildi / yaratildi.")
+    logger.info("✅ Jadvallar yaratildi.")
 
 
 async def ensure_super_admins():
